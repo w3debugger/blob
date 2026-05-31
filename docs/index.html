@@ -2,10 +2,28 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>BLOB :: disk reaper</title>
 <meta name="description" content="BLOB is a tiny, native macOS disk reaper. Three modes. No daemons. No telemetry. Everything it deletes, it can name." />
 <meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#000000" />
+<link rel="canonical" href="https://w3debugger.github.io/blob/" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ctext x='4' y='24' font-family='monospace' font-size='22' font-weight='900' fill='%232ee06a'%3EB%3C/text%3E%3C/svg%3E" />
+
+<!-- social / link previews (reuse the shipped screenshot; absolute URLs for scrapers) -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="BLOB" />
+<meta property="og:title" content="BLOB :: disk reaper" />
+<meta property="og:description" content="A tiny, native macOS disk reaper. Three modes. No daemons. No telemetry. Everything it deletes, it can name." />
+<meta property="og:url" content="https://w3debugger.github.io/blob/" />
+<meta property="og:image" content="https://w3debugger.github.io/blob/screenshot.png" />
+<meta property="og:image:width" content="2690" />
+<meta property="og:image:height" content="1792" />
+<meta property="og:image:alt" content="BLOB terminal UI listing large regenerable caches" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="BLOB :: disk reaper" />
+<meta name="twitter:description" content="A tiny, native macOS disk reaper. Three modes. No daemons. No telemetry." />
+<meta name="twitter:image" content="https://w3debugger.github.io/blob/screenshot.png" />
 
 <!-- ============================================================
      BLOB, single-file landing page. No build step, no CDN.
@@ -20,7 +38,7 @@
     --panel:rgba(0,0,0,0.55);
     --green:#2ee06a;
     --green-bright:#5cff96;
-    --green-dim:rgba(46,224,106,0.62);
+    --green-dim:rgba(46,224,106,0.78);
     --green-faint:rgba(46,224,106,0.26);
     --green-ghost:rgba(46,224,106,0.10);
     --yellow:#ffd23f;
@@ -30,7 +48,7 @@
     --glow:0 0 6px rgba(46,224,106,0.55), 0 0 18px rgba(46,224,106,0.20);
   }
 
-  *{box-sizing:border-box;margin:0;padding:0}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   html{scroll-behavior:smooth}
   body{
     background:var(--bg);
@@ -39,6 +57,8 @@
     font-size:15px;
     line-height:1.55;
     -webkit-font-smoothing:antialiased;
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
     overflow-x:hidden;
     min-height:100vh;
   }
@@ -57,14 +77,14 @@
     position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0.35;
     background:repeating-linear-gradient(to bottom,
       rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
-      rgba(0,0,0,0.25) 3px, rgba(0,0,0,0) 4px);
-    mix-blend-mode:multiply;
+      rgba(0,0,0,0.28) 3px, rgba(0,0,0,0) 4px);
   }
 
   .wrap{position:relative;z-index:3}
-  .container{max-width:1080px;margin:0 auto;padding:0 22px}
+  .container{max-width:1080px;margin:0 auto;padding:0 calc(22px + env(safe-area-inset-right)) 0 calc(22px + env(safe-area-inset-left))}
 
   a{color:inherit;text-decoration:none}
+  a:focus-visible,.btn:focus-visible,.row:focus-visible,.nav .modes a:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px;border-radius:5px}
   ::selection{background:var(--yellow);color:#000}
 
   /* ---- bracket button (TermButton clone) ---- */
@@ -112,7 +132,7 @@
   h1{font-size:clamp(38px,8vw,82px);font-weight:900;line-height:1.0;letter-spacing:-1px;text-shadow:var(--glow)}
   h1 .slash{color:var(--green-dim);font-weight:400}
   .glitch{position:relative;display:inline-block}
-  .glitch:hover::before,.glitch:hover::after{content:"BLOB";position:absolute;left:0;top:0;width:100%;height:100%}
+  .glitch:hover::before,.glitch:hover::after{content:attr(data-text);position:absolute;left:0;top:0;width:100%;height:100%}
   .glitch:hover::before{color:var(--red);transform:translate(-2px,-1px);clip-path:inset(0 0 55% 0);opacity:.7}
   .glitch:hover::after{color:#3fd1ff;transform:translate(2px,1px);clip-path:inset(55% 0 0 0);opacity:.7}
   .lede{margin-top:22px;max-width:620px;font-size:16px;color:var(--green-dim)}
@@ -138,9 +158,9 @@
   .cmd .p{color:var(--green-dim)}
   .cmd .typed{color:var(--green)}
   .rows{margin-top:14px;border:1px solid var(--green-faint);border-radius:6px;overflow:hidden}
-  .rhead,.row{display:grid;grid-template-columns:34px 96px 1fr;gap:10px;align-items:center;padding:7px 12px;font-size:13px}
+  .rhead,.row{display:grid;grid-template-columns:34px 96px minmax(0,1fr);gap:10px;align-items:center;padding:7px 12px;font-size:13px}
   .rhead{background:rgba(46,224,106,0.08);color:var(--green-dim);font-weight:700;font-size:11px;letter-spacing:.5px}
-  .row{border-top:1px solid rgba(46,224,106,0.07)}
+  .row{border-top:1px solid rgba(46,224,106,0.07);cursor:pointer}
   .row .chk{color:var(--green-dim)}
   .row.sel .chk,.row.sel .path{color:var(--yellow)}
   .row.sel{background:rgba(255,210,63,0.06)}
@@ -196,28 +216,50 @@
   .getblob p{color:var(--green-dim);margin:16px auto 30px;max-width:520px}
   .getblob .cta{justify-content:center}
 
-  footer{border-top:1px solid var(--green-faint);padding:26px 0 40px}
+  footer{border-top:1px solid var(--green-faint);padding:26px 0 calc(40px + env(safe-area-inset-bottom))}
   .frow{display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:12px;color:var(--green-dim)}
   .frow .grow{flex:1}
   footer a:hover{color:var(--green);text-shadow:var(--glow)}
+
+  /* ---- phone layout ---- */
+  @media(max-width:480px){
+    .rhead,.row{grid-template-columns:24px 72px minmax(0,1fr);gap:8px;padding:7px 10px;font-size:12px}
+    .row .sz{font-size:12px}
+    .tbody{padding:12px 10px 14px}
+    .cmd{min-height:auto;font-size:12px;word-break:break-word}
+    .rfoot .grow{display:none}
+    .rfoot .btn{flex:1;justify-content:center}
+  }
+  /* ---- bigger touch targets on touch devices ---- */
+  @media(pointer:coarse){
+    .btn{padding:12px 16px;min-height:44px}
+    .row{padding:11px 12px}
+  }
+
+  /* ---- respect reduced-motion (accessibility + mobile battery) ---- */
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+    html{scroll-behavior:auto}
+    #rain,#scan{display:none}
+  }
 </style>
 </head>
 <body>
-<canvas id="rain"></canvas>
-<div id="wash"></div>
-<div id="scan"></div>
+<canvas id="rain" aria-hidden="true"></canvas>
+<div id="wash" aria-hidden="true"></div>
+<div id="scan" aria-hidden="true"></div>
 
 <div class="wrap">
   <header>
     <div class="container nav">
-      <a class="brand" href="#top">BLOB<span class="cur">▌</span><small>disk reaper</small></a>
+      <a class="brand" href="#top">BLOB<span class="cur" aria-hidden="true">▌</span><small>disk reaper</small></a>
       <nav class="modes" aria-label="modes">
         <a href="#modes" class="active">files</a>
         <a href="#modes">dirs</a>
         <a href="#modes">dev</a>
       </nav>
       <span class="spacer"></span>
-      <a class="btn" href="#get">github</a>
+      <a class="btn" href="https://github.com/w3debugger/blob">github</a>
     </div>
   </header>
 
@@ -227,7 +269,7 @@
       <div class="container">
         <div class="kicker">// native macOS · ~2.4 MB · no telemetry · regenerable-only</div>
         <h1>
-          <span class="glitch" data-text="BLOB">BLOB</span><span class="blink">▌</span><br>
+          <span class="glitch" data-text="BLOB">BLOB</span><span class="blink" aria-hidden="true">▌</span><br>
           <span class="slash">//</span> reap dead disk space.
         </h1>
         <p class="lede">
@@ -250,21 +292,21 @@
             <span class="right"><span class="tag">watch · removed</span><span class="tag">3 modes</span></span>
           </div>
           <div class="tbody">
-            <div class="cmd"><span class="p">$ </span><span class="typed" id="typed"></span><span class="blink">▮</span></div>
+            <div class="cmd"><span class="p">$ </span><span class="typed" id="typed"></span><span class="blink" aria-hidden="true">▮</span></div>
             <div class="rows" id="rows">
-              <div class="rhead"><span>[ ]</span><span style="text-align:right">SIZE</span><span>PATH</span></div>
-              <div class="row" data-bytes="30343168000"><span class="chk">[ ]</span><span class="sz">28.26 GB</span><span class="path">~/Library/Developer/Xcode/DerivedData</span></div>
-              <div class="row" data-bytes="7881170944"><span class="chk">[ ]</span><span class="sz">7.34 GB</span><span class="path">~/Library/Caches/Yarn</span></div>
-              <div class="row" data-bytes="7461130240"><span class="chk">[ ]</span><span class="sz">6.95 GB</span><span class="path">~/Library/Developer/Xcode/iOS DeviceSupport</span></div>
-              <div class="row" data-bytes="972661760"><span class="chk">[ ]</span><span class="sz">927.4 MB</span><span class="path">~/Library/Caches/Homebrew</span></div>
-              <div class="row" data-bytes="751828582"><span class="chk">[ ]</span><span class="sz">717.1 MB</span><span class="path">~/.npm/_cacache</span></div>
-              <div class="row" data-bytes="77931315"><span class="chk">[ ]</span><span class="sz">74.3 MB</span><span class="path">~/Library/Application Support/Code/CachedData</span></div>
-              <div class="row" data-bytes="69939200"><span class="chk">[ ]</span><span class="sz">66.7 MB</span><span class="path">~/.cargo/registry/src</span></div>
-              <div class="row" data-bytes="37748736"><span class="chk">[ ]</span><span class="sz">36.0 MB</span><span class="path">~/go/pkg/mod/cache</span></div>
+              <div class="rhead"><span aria-hidden="true">[ ]</span><span style="text-align:right">SIZE</span><span>PATH</span></div>
+              <div class="row" role="button" tabindex="0" aria-pressed="false" data-bytes="30343168000"><span class="chk" aria-hidden="true">[ ]</span><span class="sz">28.26 GB</span><span class="path">~/Library/Developer/Xcode/DerivedData</span></div>
+              <div class="row" role="button" tabindex="0" aria-pressed="false" data-bytes="7881170944"><span class="chk" aria-hidden="true">[ ]</span><span class="sz">7.34 GB</span><span class="path">~/Library/Caches/Yarn</span></div>
+              <div class="row" role="button" tabindex="0" aria-pressed="false" data-bytes="7461130240"><span class="chk" aria-hidden="true">[ ]</span><span class="sz">6.95 GB</span><span class="path">~/Library/Developer/Xcode/iOS DeviceSupport</span></div>
+              <div class="row" role="button" tabindex="0" aria-pressed="false" data-bytes="972661760"><span class="chk" aria-hidden="true">[ ]</span><span class="sz">927.4 MB</span><span class="path">~/Library/Caches/Homebrew</span></div>
+              <div class="row" role="button" tabindex="0" aria-pressed="false" data-bytes="751828582"><span class="chk" aria-hidden="true">[ ]</span><span class="sz">717.1 MB</span><span class="path">~/.npm/_cacache</span></div>
+              <div class="row" role="button" tabindex="0" aria-pressed="false" data-bytes="77931315"><span class="chk" aria-hidden="true">[ ]</span><span class="sz">74.3 MB</span><span class="path">~/Library/Application Support/Code/CachedData</span></div>
+              <div class="row" role="button" tabindex="0" aria-pressed="false" data-bytes="69939200"><span class="chk" aria-hidden="true">[ ]</span><span class="sz">66.7 MB</span><span class="path">~/.cargo/registry/src</span></div>
+              <div class="row" role="button" tabindex="0" aria-pressed="false" data-bytes="37748736"><span class="chk" aria-hidden="true">[ ]</span><span class="sz">36.0 MB</span><span class="path">~/go/pkg/mod/cache</span></div>
             </div>
             <div class="rfoot">
-              <span class="stat" id="count">// <b>8 items</b> · <b id="total">0.00 GB</b> · regenerable</span>
-              <span class="freed" id="freed"></span>
+              <span class="stat" id="count" aria-live="polite">// <b>8 items</b> · <b id="total">0.00 GB</b> · regenerable</span>
+              <span class="freed" id="freed" aria-live="polite"></span>
               <span class="grow"></span>
               <button class="btn" id="selall">select all</button>
               <button class="btn danger" id="purge">purge</button>
@@ -346,7 +388,7 @@
     <!-- GET -->
     <section class="block getblob" id="get">
       <div class="container">
-        <div class="big">get blob<span class="blink">▌</span></div>
+        <div class="big">get blob<span class="blink" aria-hidden="true">▌</span></div>
         <p>// free, open source, and small enough to read in an afternoon. clone it, build it with <code>swift build</code>, and reap.</p>
         <div class="cta">
           <a class="btn solid" href="https://github.com/w3debugger/blob/releases/latest/download/Blob.dmg">download for macOS</a>
@@ -359,7 +401,7 @@
 
   <footer>
     <div class="container frow">
-      <span class="brand" style="font-size:15px">BLOB<span class="cur">▌</span></span>
+      <span class="brand" style="font-size:15px">BLOB<span class="cur" aria-hidden="true">▌</span></span>
       <span class="grow"></span>
       <span>// built with SwiftUI · macOS 14+</span>
       <a href="https://github.com/w3debugger/blob">github</a>
@@ -369,11 +411,14 @@
 </div>
 
 <script>
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 /* ============================================================
    1. MATRIX RAIN, faithful port of MatrixRain.swift
    ============================================================ */
 (function(){
   const c = document.getElementById('rain');
+  if(REDUCE){ c.remove(); return; }          // honor Reduce Motion: no canvas, no loop
   const ctx = c.getContext('2d');
   const GLYPHS = "01ｱｲｳｴｵｶｷｸｹｺ#@$%&*+=<>".split("");
   const COL_W = 14, ROW_H = 16, FONT = 14;
@@ -388,9 +433,10 @@
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.font = '500 ' + FONT + "px ui-monospace, 'SF Mono', Menlo, monospace";
     ctx.textBaseline = 'alphabetic';
-    const n = Math.max(1, Math.floor(W / COL_W));
+    const colW = W < 760 ? 20 : COL_W;                 // fewer columns on phones, no visible diff
+    const n = Math.min(90, Math.max(1, Math.floor(W / colW)));
     cols = Array.from({length:n}, (_,i)=>({
-      x: i*COL_W + 4,
+      x: i*colW + 4,
       headY: rand(-200, H),
       speed: rand(1,3)*ROW_H,
       length: (rand(6,20))|0,
@@ -429,10 +475,11 @@
   }
 
   build();
-  window.addEventListener('resize', build);
-  // ~12fps, keeps the app's deliberately chunky retro cadence, easy on the CPU
+  let rt; window.addEventListener('resize', ()=>{ clearTimeout(rt); rt = setTimeout(build, 150); }, {passive:true});
+  // ~12fps, keeps the app's deliberately chunky retro cadence, easy on the CPU.
+  // Skip work entirely while the tab is hidden so phones can idle the CPU/battery.
   let last = 0;
-  function loop(t){ if(t-last >= 84){ last = t; tick(); } requestAnimationFrame(loop); }
+  function loop(t){ if(!document.hidden && t-last >= 84){ last = t; tick(); } requestAnimationFrame(loop); }
   requestAnimationFrame(loop);
 })();
 
@@ -442,6 +489,7 @@
 (function(){
   const el = document.getElementById('typed');
   const text = "blob scan ~/Library --dev   # reclaim regenerable caches";
+  if(REDUCE){ el.textContent = text; return; }
   let i = 0;
   function type(){
     if(i <= text.length){ el.textContent = text.slice(0,i++); setTimeout(type, 38 + Math.random()*45); }
@@ -462,6 +510,7 @@
   let done = false;
   function run(){
     if(done) return; done = true;
+    if(REDUCE){ totalEl.textContent = fmt(totalBytes); return; }
     const dur = 1100, t0 = performance.now();
     function step(t){
       const k = Math.min(1, (t-t0)/dur);
@@ -498,15 +547,20 @@
     purgeBtn.textContent = sel.length ? ('purge ' + fmt(selectedBytes())) : 'purge';
   }
 
-  rows.forEach(r=>r.addEventListener('click', ()=>{
-    if(r.classList.contains('gone')) return;
-    r.classList.toggle('sel'); refreshPurge();
-  }));
+  rows.forEach(r=>{
+    r.addEventListener('click', ()=>{
+      if(r.classList.contains('gone')) return;
+      r.classList.toggle('sel');
+      r.setAttribute('aria-pressed', r.classList.contains('sel'));
+      refreshPurge();
+    });
+    r.addEventListener('keydown', e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); r.click(); } });
+  });
 
   let allOn = false;
   selBtn.addEventListener('click', ()=>{
     allOn = !allOn;
-    rows.forEach(r=>{ if(!r.classList.contains('gone')) r.classList.toggle('sel', allOn); });
+    rows.forEach(r=>{ if(!r.classList.contains('gone')){ r.classList.toggle('sel', allOn); r.setAttribute('aria-pressed', allOn); } });
     selBtn.textContent = allOn ? 'deselect all' : 'select all';
     refreshPurge();
   });
@@ -520,7 +574,7 @@
     const reclaimed = selectedBytes();
     // animate rows disappearing one by one, like the trash sweep log
     targets.forEach((r,idx)=>setTimeout(()=>{
-      r.classList.remove('sel'); r.classList.add('gone');
+      r.classList.remove('sel'); r.classList.add('gone'); r.setAttribute('aria-pressed','false');
       const remaining = rows.filter(x=>!x.classList.contains('gone'))
                             .reduce((s,x)=>s + (+x.dataset.bytes||0), 0);
       totalEl.textContent = fmt(remaining);
@@ -535,7 +589,7 @@
       refreshPurge();
       // reset after a beat so the demo is replayable
       setTimeout(()=>{
-        rows.forEach(r=>r.classList.remove('gone','sel'));
+        rows.forEach(r=>{ r.classList.remove('gone','sel'); r.setAttribute('aria-pressed','false'); });
         const full = rows.reduce((s,x)=>s + (+x.dataset.bytes||0), 0);
         totalEl.textContent = fmt(full);
         const live = rows.length;
@@ -552,16 +606,6 @@
 
 /* tiny niceties */
 document.getElementById('yr').textContent = new Date().getFullYear();
-
-/* active mode pill follows scroll near the modes section */
-(function(){
-  const links = [...document.querySelectorAll('.nav .modes a')];
-  const modes = document.getElementById('modes');
-  if(!modes) return;
-  const io = new IntersectionObserver((es)=>{
-    es.forEach(e=>{ links.forEach(l=>l.classList.toggle('active', e.isIntersecting && l.textContent==='dev' ? false : l.classList.contains('active'))); });
-  });
-})();
 </script>
 </body>
 </html>
