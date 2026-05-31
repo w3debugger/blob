@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    Developer ID (non Mac App Store), hardened-runtime app.
+    A Trash-based disk utility needs no special entitlements: Full Disk
+    Access is granted by the user at runtime via TCC, not by an entitlement.
+    Add hardened-runtime exceptions here only if a future feature requires
+    one (e.g. com.apple.security.cs.disable-library-validation).
+  -->
+</dict>
+</plist>

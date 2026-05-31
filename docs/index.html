@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BLOB :: disk reaper</title>
+<meta name="description" content="BLOB is a tiny, native macOS disk reaper. Three modes. No daemons. No telemetry. Everything it deletes, it can name." />
+<meta name="color-scheme" content="dark" />
+
+<!-- ============================================================
+     BLOB, single-file landing page. No build step, no CDN.
+     Drop into a GitHub Pages repo (root, or /docs) and ship.
+     Theme is lifted straight from the SwiftUI app:
+     matrix rain, terminal green on black, [ bracket ] buttons.
+     ============================================================ -->
+
+<style>
+  :root{
+    --bg:#000000;
+    --panel:rgba(0,0,0,0.55);
+    --green:#2ee06a;
+    --green-bright:#5cff96;
+    --green-dim:rgba(46,224,106,0.62);
+    --green-faint:rgba(46,224,106,0.26);
+    --green-ghost:rgba(46,224,106,0.10);
+    --yellow:#ffd23f;
+    --red:#ff5a5a;
+    --white:#dcffe7;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,"JetBrains Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --glow:0 0 6px rgba(46,224,106,0.55), 0 0 18px rgba(46,224,106,0.20);
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);
+    color:var(--green);
+    font-family:var(--mono);
+    font-size:15px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+    min-height:100vh;
+  }
+
+  /* ---- matrix rain canvas ---- */
+  #rain{position:fixed;inset:0;z-index:0;opacity:0.22;pointer-events:none}
+  /* vignette + readability wash over the rain */
+  #wash{
+    position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:
+      radial-gradient(120% 90% at 50% -10%, rgba(46,224,106,0.07), transparent 60%),
+      radial-gradient(140% 120% at 50% 50%, transparent 55%, rgba(0,0,0,0.78) 100%);
+  }
+  /* CRT scanlines */
+  #scan{
+    position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0.35;
+    background:repeating-linear-gradient(to bottom,
+      rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
+      rgba(0,0,0,0.25) 3px, rgba(0,0,0,0) 4px);
+    mix-blend-mode:multiply;
+  }
+
+  .wrap{position:relative;z-index:3}
+  .container{max-width:1080px;margin:0 auto;padding:0 22px}
+
+  a{color:inherit;text-decoration:none}
+  ::selection{background:var(--yellow);color:#000}
+
+  /* ---- bracket button (TermButton clone) ---- */
+  .btn{
+    display:inline-flex;align-items:center;gap:.5ch;
+    font:inherit;font-weight:700;font-size:13px;
+    color:var(--green);
+    padding:9px 14px;border:1px solid var(--green-dim);border-radius:5px;
+    background:transparent;cursor:pointer;white-space:nowrap;
+    transition:background .12s ease, color .12s ease, box-shadow .12s ease, transform .05s ease;
+  }
+  .btn::before{content:"[ "}
+  .btn::after{content:" ]"}
+  .btn:hover{background:rgba(46,224,106,0.16);box-shadow:var(--glow)}
+  .btn:active{transform:translateY(1px)}
+  .btn.solid{background:var(--green);color:#000;border-color:var(--green)}
+  .btn.solid:hover{background:var(--green-bright);border-color:var(--green-bright)}
+  .btn.danger{color:var(--red);border-color:rgba(255,90,90,0.55)}
+  .btn.danger:hover{background:rgba(255,90,90,0.16);box-shadow:0 0 8px rgba(255,90,90,0.4)}
+
+  .comment{color:var(--green-dim)}
+  .dim{color:var(--green-dim)}
+  .yellow{color:var(--yellow)}
+  .blink{animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* ---- top nav ---- */
+  header{position:sticky;top:0;z-index:30;backdrop-filter:blur(3px);
+    background:linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.55));
+    border-bottom:1px solid var(--green-faint)}
+  .nav{display:flex;align-items:center;gap:14px;height:56px}
+  .brand{display:flex;align-items:baseline;gap:7px;font-weight:900;font-size:19px;letter-spacing:.5px;text-shadow:var(--glow)}
+  .brand .cur{font-weight:300;color:var(--green-dim)}
+  .brand small{font-size:11px;font-weight:400;color:var(--green-dim);letter-spacing:0}
+  .nav .modes{display:flex;margin-left:18px;border:1px solid var(--green-dim);border-radius:5px;overflow:hidden}
+  .nav .modes a{font-size:12px;font-weight:700;padding:6px 15px;color:var(--green);transition:background .12s,color .12s}
+  .nav .modes a:hover{background:rgba(46,224,106,0.15)}
+  .nav .modes a.active{background:var(--green);color:#000}
+  .nav .spacer{flex:1}
+  @media(max-width:720px){.nav .modes{display:none}}
+
+  /* ---- hero ---- */
+  .hero{padding:64px 0 30px}
+  .kicker{font-size:12px;color:var(--green-dim);letter-spacing:1px;margin-bottom:18px}
+  h1{font-size:clamp(38px,8vw,82px);font-weight:900;line-height:1.0;letter-spacing:-1px;text-shadow:var(--glow)}
+  h1 .slash{color:var(--green-dim);font-weight:400}
+  .glitch{position:relative;display:inline-block}
+  .glitch:hover::before,.glitch:hover::after{content:"BLOB";position:absolute;left:0;top:0;width:100%;height:100%}
+  .glitch:hover::before{color:var(--red);transform:translate(-2px,-1px);clip-path:inset(0 0 55% 0);opacity:.7}
+  .glitch:hover::after{color:#3fd1ff;transform:translate(2px,1px);clip-path:inset(55% 0 0 0);opacity:.7}
+  .lede{margin-top:22px;max-width:620px;font-size:16px;color:var(--green-dim)}
+  .lede b{color:var(--green);font-weight:700}
+  .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px;align-items:center}
+  .cta .meta{font-size:12px;color:var(--green-dim)}
+
+  /* ---- terminal window (the centerpiece) ---- */
+  .terminal{
+    margin:46px 0 10px;border:1px solid var(--green-dim);border-radius:8px;overflow:hidden;
+    background:var(--panel);box-shadow:0 0 0 1px rgba(0,0,0,0.5), 0 30px 80px rgba(0,0,0,0.7), inset 0 0 60px rgba(46,224,106,0.03);
+  }
+  .tbar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--green-faint);background:rgba(0,0,0,0.4)}
+  .lights{display:flex;gap:7px}
+  .lights i{width:11px;height:11px;border-radius:50%;display:block}
+  .lights .r{background:#ff5f57}.lights .y{background:#febc2e}.lights .g{background:#28c840}
+  .tbar .title{font-size:12px;color:var(--green-dim);letter-spacing:.4px}
+  .tbar .right{margin-left:auto;display:flex;gap:6px}
+  .tag{font-size:11px;border:1px solid var(--green-faint);border-radius:4px;padding:3px 8px;color:var(--green-dim)}
+
+  .tbody{padding:16px 16px 18px}
+  .cmd{font-size:14px;min-height:22px}
+  .cmd .p{color:var(--green-dim)}
+  .cmd .typed{color:var(--green)}
+  .rows{margin-top:14px;border:1px solid var(--green-faint);border-radius:6px;overflow:hidden}
+  .rhead,.row{display:grid;grid-template-columns:34px 96px 1fr;gap:10px;align-items:center;padding:7px 12px;font-size:13px}
+  .rhead{background:rgba(46,224,106,0.08);color:var(--green-dim);font-weight:700;font-size:11px;letter-spacing:.5px}
+  .row{border-top:1px solid rgba(46,224,106,0.07)}
+  .row .chk{color:var(--green-dim)}
+  .row.sel .chk,.row.sel .path{color:var(--yellow)}
+  .row.sel{background:rgba(255,210,63,0.06)}
+  .row .sz{text-align:right;color:var(--green)}
+  .row .path{color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row.gone{opacity:.28}
+  .row.gone .path{text-decoration:line-through}
+  .rfoot{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:14px}
+  .stat{font-size:13px;color:var(--green-dim)}
+  .stat b{color:var(--green)}
+  .rfoot .grow{flex:1;min-width:8px}
+  .freed{font-size:13px;color:var(--yellow);opacity:0;transition:opacity .3s}
+  .freed.show{opacity:1}
+
+  /* ---- section scaffolding ---- */
+  section.block{padding:62px 0;border-top:1px solid var(--green-faint)}
+  .h2{font-size:13px;color:var(--green-dim);letter-spacing:1px;margin-bottom:8px}
+  .h2 b{color:var(--green)}
+  .lead{font-size:clamp(24px,4vw,34px);font-weight:800;letter-spacing:-.5px;max-width:760px;text-shadow:var(--glow)}
+  .lead .slash{color:var(--green-dim);font-weight:400}
+
+  /* ---- mode cards ---- */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:34px}
+  @media(max-width:760px){.cards{grid-template-columns:1fr}}
+  .card{border:1px solid var(--green-dim);border-radius:8px;padding:20px;background:var(--panel);
+    transition:border-color .15s, box-shadow .15s, transform .15s;position:relative;overflow:hidden}
+  .card::after{content:"";position:absolute;inset:0;background:radial-gradient(80% 60% at 50% 0%,rgba(46,224,106,0.08),transparent 70%);opacity:0;transition:opacity .2s}
+  .card:hover{border-color:var(--green);box-shadow:var(--glow);transform:translateY(-3px)}
+  .card:hover::after{opacity:1}
+  .card .tab{display:inline-block;font-weight:700;font-size:13px;color:#000;background:var(--green);padding:3px 12px;border-radius:4px}
+  .card h3{margin:16px 0 8px;font-size:19px;font-weight:800}
+  .card p{color:var(--green-dim);font-size:14px}
+  .card .ex{margin-top:14px;font-size:12px;color:var(--green-dim);border-top:1px dashed var(--green-faint);padding-top:12px}
+  .card .ex code{color:var(--green)}
+
+  /* ---- stat strip ---- */
+  .strip{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:30px}
+  @media(max-width:760px){.strip{grid-template-columns:repeat(2,1fr)}}
+  .pill{border:1px solid var(--green-faint);border-radius:8px;padding:20px;background:var(--panel);text-align:left}
+  .pill .n{font-size:34px;font-weight:900;text-shadow:var(--glow)}
+  .pill .l{font-size:12px;color:var(--green-dim);margin-top:4px}
+
+  /* ---- shortcuts ---- */
+  .keys{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 28px;margin-top:28px;max-width:820px}
+  @media(max-width:620px){.keys{grid-template-columns:1fr}}
+  .kr{display:flex;align-items:baseline;gap:14px;padding:7px 0;border-bottom:1px solid rgba(46,224,106,0.08)}
+  .kr kbd{font-family:inherit;color:var(--yellow);min-width:118px;font-size:13px}
+  .kr span{color:var(--green-dim);font-size:13px}
+
+  /* ---- big CTA ---- */
+  .getblob{text-align:center;padding:78px 0}
+  .getblob .big{font-size:clamp(30px,6vw,56px);font-weight:900;letter-spacing:-1px;text-shadow:var(--glow)}
+  .getblob p{color:var(--green-dim);margin:16px auto 30px;max-width:520px}
+  .getblob .cta{justify-content:center}
+
+  footer{border-top:1px solid var(--green-faint);padding:26px 0 40px}
+  .frow{display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:12px;color:var(--green-dim)}
+  .frow .grow{flex:1}
+  footer a:hover{color:var(--green);text-shadow:var(--glow)}
+</style>
+</head>
+<body>
+<canvas id="rain"></canvas>
+<div id="wash"></div>
+<div id="scan"></div>
+
+<div class="wrap">
+  <header>
+    <div class="container nav">
+      <a class="brand" href="#top">BLOB<span class="cur">▌</span><small>disk reaper</small></a>
+      <nav class="modes" aria-label="modes">
+        <a href="#modes" class="active">files</a>
+        <a href="#modes">dirs</a>
+        <a href="#modes">dev</a>
+      </nav>
+      <span class="spacer"></span>
+      <a class="btn" href="#get">github</a>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="container">
+        <div class="kicker">// native macOS · ~2.4 MB · no telemetry · regenerable-only</div>
+        <h1>
+          <span class="glitch" data-text="BLOB">BLOB</span><span class="blink">▌</span><br>
+          <span class="slash">//</span> reap dead disk space.
+        </h1>
+        <p class="lede">
+          A tiny terminal-green disk cleaner for macOS. It hunts the big stuff,
+          shows you <b>every path before it touches it</b>, and moves things to the
+          Trash, never a blind delete. Three honest modes. Nothing running in the
+          background.
+        </p>
+        <div class="cta">
+          <a class="btn solid" href="#get">download for macOS</a>
+          <a class="btn" href="#modes">see how it works</a>
+          <span class="meta">// macOS 14+ · Apple Silicon</span>
+        </div>
+
+        <!-- TERMINAL CENTERPIECE -->
+        <div class="terminal" id="demo">
+          <div class="tbar">
+            <span class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></span>
+            <span class="title">BLOB :: disk reaper, dev</span>
+            <span class="right"><span class="tag">watch · removed</span><span class="tag">3 modes</span></span>
+          </div>
+          <div class="tbody">
+            <div class="cmd"><span class="p">$ </span><span class="typed" id="typed"></span><span class="blink">▮</span></div>
+            <div class="rows" id="rows">
+              <div class="rhead"><span>[ ]</span><span style="text-align:right">SIZE</span><span>PATH</span></div>
+              <div class="row" data-bytes="30343168000"><span class="chk">[ ]</span><span class="sz">28.26 GB</span><span class="path">~/Library/Developer/Xcode/DerivedData</span></div>
+              <div class="row" data-bytes="7881170944"><span class="chk">[ ]</span><span class="sz">7.34 GB</span><span class="path">~/Library/Caches/Yarn</span></div>
+              <div class="row" data-bytes="7461130240"><span class="chk">[ ]</span><span class="sz">6.95 GB</span><span class="path">~/Library/Developer/Xcode/iOS DeviceSupport</span></div>
+              <div class="row" data-bytes="972661760"><span class="chk">[ ]</span><span class="sz">927.4 MB</span><span class="path">~/Library/Caches/Homebrew</span></div>
+              <div class="row" data-bytes="751828582"><span class="chk">[ ]</span><span class="sz">717.1 MB</span><span class="path">~/.npm/_cacache</span></div>
+              <div class="row" data-bytes="77931315"><span class="chk">[ ]</span><span class="sz">74.3 MB</span><span class="path">~/Library/Application Support/Code/CachedData</span></div>
+              <div class="row" data-bytes="69939200"><span class="chk">[ ]</span><span class="sz">66.7 MB</span><span class="path">~/.cargo/registry/src</span></div>
+              <div class="row" data-bytes="37748736"><span class="chk">[ ]</span><span class="sz">36.0 MB</span><span class="path">~/go/pkg/mod/cache</span></div>
+            </div>
+            <div class="rfoot">
+              <span class="stat" id="count">// <b>8 items</b> · <b id="total">0.00 GB</b> · regenerable</span>
+              <span class="freed" id="freed"></span>
+              <span class="grow"></span>
+              <button class="btn" id="selall">select all</button>
+              <button class="btn danger" id="purge">purge</button>
+            </div>
+          </div>
+        </div>
+        <div class="kicker" style="margin-top:14px">// ↑ live demo, go ahead, <span class="yellow">select all</span> and <span style="color:var(--red)">purge</span>. it's only pixels.</div>
+      </div>
+    </section>
+
+    <!-- MODES -->
+    <section class="block" id="modes">
+      <div class="container">
+        <div class="h2">// <b>three modes</b>. that's the whole app.</div>
+        <div class="lead"><span class="slash">//</span> the rest was bloat, so it's gone.</div>
+        <div class="cards">
+          <div class="card">
+            <span class="tab">files</span>
+            <h3>biggest single files</h3>
+            <p>Point it at any folder, set a size floor, and it surfaces the heaviest individual files on disk, the forgotten ISOs, video exports, and 4&nbsp;GB log files.</p>
+            <div class="ex"><code>// files mode finds individual large files</code></div>
+          </div>
+          <div class="card">
+            <span class="tab">dirs</span>
+            <h3>fat folders by name</h3>
+            <p>Finds directories by name and ranks them by total recursive size. Built for hunting <code>node_modules</code>, <code>build</code>, <code>target</code>, <code>.gradle</code> scattered across every project.</p>
+            <div class="ex"><code>// watching: node_modules, dist, .next, Pods, target…</code></div>
+          </div>
+          <div class="card">
+            <span class="tab">dev</span>
+            <h3>developer caches</h3>
+            <p>One tap inventories the regenerable junk: Xcode DerivedData &amp; simulators, npm / yarn / pnpm, gradle, cargo, Homebrew. <b>Only caches that rebuild themselves</b>, never your archives or data.</p>
+            <div class="ex"><code>// sweeping developer caches · all regenerable</code></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ETHOS -->
+    <section class="block">
+      <div class="container">
+        <div class="h2">// <b>less app</b>, on purpose</div>
+        <div class="lead"><span class="slash">//</span> everything it deletes, it can name.</div>
+        <div class="strip">
+          <div class="pill"><div class="n">3</div><div class="l">// modes, not twelve</div></div>
+          <div class="pill"><div class="n">0</div><div class="l">// background daemons</div></div>
+          <div class="pill"><div class="n">0</div><div class="l">// telemetry, ever</div></div>
+          <div class="pill"><div class="n">↩</div><div class="l">// Trash, not rm -rf</div></div>
+        </div>
+        <p class="lede" style="margin-top:30px">
+          No menubar resident. No "watching" your Trash in the background. No phone-home.
+          Blob opens, scans when <i>you</i> say scan, shows the full path of every byte,
+          and moves selected items to the Trash so you can change your mind. Then it gets
+          out of the way.
+        </p>
+      </div>
+    </section>
+
+    <!-- SHORTCUTS -->
+    <section class="block">
+      <div class="container">
+        <div class="h2">// <b>keyboard-first</b></div>
+        <div class="lead"><span class="slash">//</span> hands stay on the keys.</div>
+        <div class="keys">
+          <div class="kr"><kbd>↑ ↓</kbd><span>move focus up / down</span></div>
+          <div class="kr"><kbd>PgUp PgDn</kbd><span>move focus by 10</span></div>
+          <div class="kr"><kbd>Home End</kbd><span>jump to first / last</span></div>
+          <div class="kr"><kbd>Return</kbd><span>reveal row in Finder</span></div>
+          <div class="kr"><kbd>Space</kbd><span>toggle focused row</span></div>
+          <div class="kr"><kbd>a / d</kbd><span>select all / deselect all</span></div>
+          <div class="kr"><kbd>i</kbd><span>add selected to ignore list</span></div>
+          <div class="kr"><kbd>t</kbd><span>move selected to Trash</span></div>
+          <div class="kr"><kbd>/</kbd><span>focus the filter</span></div>
+          <div class="kr"><kbd>?</kbd><span>show shortcuts</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GET -->
+    <section class="block getblob" id="get">
+      <div class="container">
+        <div class="big">get blob<span class="blink">▌</span></div>
+        <p>// free, open source, and small enough to read in an afternoon. clone it, build it with <code>swift build</code>, and reap.</p>
+        <div class="cta">
+          <a class="btn solid" href="https://github.com/w3debugger/blob/releases">download .app</a>
+          <a class="btn" href="https://github.com/w3debugger/blob">view source</a>
+          <a class="btn" href="https://github.com/w3debugger/blob">swift build</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container frow">
+      <span class="brand" style="font-size:15px">BLOB<span class="cur">▌</span></span>
+      <span class="grow"></span>
+      <span>// built with SwiftUI · macOS 14+</span>
+      <a href="https://github.com/w3debugger/blob">github</a>
+      <span class="dim">© <span id="yr"></span> · move to Trash responsibly.</span>
+    </div>
+  </footer>
+</div>
+
+<script>
+/* ============================================================
+   1. MATRIX RAIN, faithful port of MatrixRain.swift
+   ============================================================ */
+(function(){
+  const c = document.getElementById('rain');
+  const ctx = c.getContext('2d');
+  const GLYPHS = "01ｱｲｳｴｵｶｷｸｹｺ#@$%&*+=<>".split("");
+  const COL_W = 14, ROW_H = 16, FONT = 14;
+  let cols = [], W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function rand(a,b){return a + Math.random()*(b-a);}
+  function pick(){return GLYPHS[(Math.random()*GLYPHS.length)|0];}
+
+  function build(){
+    W = c.clientWidth; H = c.clientHeight;
+    c.width = W*dpr; c.height = H*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.font = '500 ' + FONT + "px ui-monospace, 'SF Mono', Menlo, monospace";
+    ctx.textBaseline = 'alphabetic';
+    const n = Math.max(1, Math.floor(W / COL_W));
+    cols = Array.from({length:n}, (_,i)=>({
+      x: i*COL_W + 4,
+      headY: rand(-200, H),
+      speed: rand(1,3)*ROW_H,
+      length: (rand(6,20))|0,
+      chars: Array.from({length:24}, pick)
+    }));
+  }
+
+  function tick(){
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0,0,W,H);
+    for(const col of cols){
+      for(let i=0;i<col.length;i++){
+        const y = col.headY - i*ROW_H;
+        if(y < -ROW_H || y > H) continue;
+        const ch = col.chars[i % col.chars.length];
+        const a = i===0 ? 1.0 : Math.max(0.05, 1.0 - i/col.length);
+        ctx.fillStyle = i===0
+          ? 'rgba(220,255,231,'+a+')'
+          : 'rgba(46,224,106,'+(a*0.9)+')';
+        ctx.fillText(ch, col.x, y);
+      }
+    }
+    // advance
+    for(const col of cols){
+      col.headY += col.speed * 0.4;
+      if(col.headY - col.length*ROW_H > H){
+        col.headY = -rand(0,200);
+        col.speed = rand(1,3)*ROW_H;
+        col.length = (rand(6,20))|0;
+        col.chars = Array.from({length:24}, pick);
+      }
+      if(((Math.random()*11)|0)===0){
+        col.chars[(Math.random()*col.chars.length)|0] = pick();
+      }
+    }
+  }
+
+  build();
+  window.addEventListener('resize', build);
+  // ~12fps, keeps the app's deliberately chunky retro cadence, easy on the CPU
+  let last = 0;
+  function loop(t){ if(t-last >= 84){ last = t; tick(); } requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+})();
+
+/* ============================================================
+   2. TYPEWRITER on the demo command line
+   ============================================================ */
+(function(){
+  const el = document.getElementById('typed');
+  const text = "blob scan ~/Library --dev   # reclaim regenerable caches";
+  let i = 0;
+  function type(){
+    if(i <= text.length){ el.textContent = text.slice(0,i++); setTimeout(type, 38 + Math.random()*45); }
+  }
+  setTimeout(type, 450);
+})();
+
+/* ============================================================
+   3. COUNT-UP total when the demo scrolls into view
+   ============================================================ */
+(function(){
+  const rows = [...document.querySelectorAll('#rows .row')];
+  const totalBytes = rows.reduce((s,r)=>s + (+r.dataset.bytes||0), 0);
+  const totalEl = document.getElementById('total');
+  const GB = 1024*1024*1024;
+  function fmt(b){ return (b/GB).toFixed(2) + ' GB'; }
+
+  let done = false;
+  function run(){
+    if(done) return; done = true;
+    const dur = 1100, t0 = performance.now();
+    function step(t){
+      const k = Math.min(1, (t-t0)/dur);
+      const e = 1 - Math.pow(1-k, 3); // easeOutCubic
+      totalEl.textContent = fmt(totalBytes * e);
+      if(k < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  const io = new IntersectionObserver((es)=>{ es.forEach(e=>{ if(e.isIntersecting) run(); }); }, {threshold:.4});
+  io.observe(document.getElementById('demo'));
+})();
+
+/* ============================================================
+   4. INTERACTIVE select-all + purge (the fun part)
+   ============================================================ */
+(function(){
+  const rows = [...document.querySelectorAll('#rows .row')];
+  const totalBytes = rows.reduce((s,r)=>s + (+r.dataset.bytes||0), 0);
+  const GB = 1024*1024*1024;
+  const fmt = b => (b/GB).toFixed(2) + ' GB';
+  const selBtn = document.getElementById('selall');
+  const purgeBtn = document.getElementById('purge');
+  const freed = document.getElementById('freed');
+  const totalEl = document.getElementById('total');
+  const countEl = document.getElementById('count');
+
+  function selectedBytes(){
+    return rows.filter(r=>r.classList.contains('sel') && !r.classList.contains('gone'))
+               .reduce((s,r)=>s + (+r.dataset.bytes||0), 0);
+  }
+  function refreshPurge(){
+    const sel = rows.filter(r=>r.classList.contains('sel') && !r.classList.contains('gone'));
+    purgeBtn.textContent = sel.length ? ('purge ' + fmt(selectedBytes())) : 'purge';
+  }
+
+  rows.forEach(r=>r.addEventListener('click', ()=>{
+    if(r.classList.contains('gone')) return;
+    r.classList.toggle('sel'); refreshPurge();
+  }));
+
+  let allOn = false;
+  selBtn.addEventListener('click', ()=>{
+    allOn = !allOn;
+    rows.forEach(r=>{ if(!r.classList.contains('gone')) r.classList.toggle('sel', allOn); });
+    selBtn.textContent = allOn ? 'deselect all' : 'select all';
+    refreshPurge();
+  });
+
+  let busy = false;
+  purgeBtn.addEventListener('click', ()=>{
+    if(busy) return;
+    const targets = rows.filter(r=>r.classList.contains('sel') && !r.classList.contains('gone'));
+    if(!targets.length){ flash(purgeBtn); return; }
+    busy = true;
+    const reclaimed = selectedBytes();
+    // animate rows disappearing one by one, like the trash sweep log
+    targets.forEach((r,idx)=>setTimeout(()=>{
+      r.classList.remove('sel'); r.classList.add('gone');
+      const remaining = rows.filter(x=>!x.classList.contains('gone'))
+                            .reduce((s,x)=>s + (+x.dataset.bytes||0), 0);
+      totalEl.textContent = fmt(remaining);
+      const live = rows.filter(x=>!x.classList.contains('gone')).length;
+      countEl.innerHTML = '// <b>'+live+' item'+(live===1?'':'s')+'</b> · <b>'+fmt(remaining)+'</b> · regenerable';
+    }, idx*160));
+
+    setTimeout(()=>{
+      freed.textContent = '✓ freed ' + fmt(reclaimed) + ', back to the Trash';
+      freed.classList.add('show');
+      selBtn.textContent = 'select all'; allOn = false;
+      refreshPurge();
+      // reset after a beat so the demo is replayable
+      setTimeout(()=>{
+        rows.forEach(r=>r.classList.remove('gone','sel'));
+        const full = rows.reduce((s,x)=>s + (+x.dataset.bytes||0), 0);
+        totalEl.textContent = fmt(full);
+        const live = rows.length;
+        countEl.innerHTML = '// <b>'+live+' items</b> · <b>'+fmt(full)+'</b> · regenerable';
+        freed.classList.remove('show');
+        busy = false;
+      }, 2600);
+    }, targets.length*160 + 250);
+  });
+
+  function flash(btn){ btn.style.boxShadow='0 0 10px rgba(255,90,90,.7)'; setTimeout(()=>btn.style.boxShadow='',220); }
+  refreshPurge();
+})();
+
+/* tiny niceties */
+document.getElementById('yr').textContent = new Date().getFullYear();
+
+/* active mode pill follows scroll near the modes section */
+(function(){
+  const links = [...document.querySelectorAll('.nav .modes a')];
+  const modes = document.getElementById('modes');
+  if(!modes) return;
+  const io = new IntersectionObserver((es)=>{
+    es.forEach(e=>{ links.forEach(l=>l.classList.toggle('active', e.isIntersecting && l.textContent==='dev' ? false : l.classList.contains('active'))); });
+  });
+})();
+</script>
+</body>
+</html>
